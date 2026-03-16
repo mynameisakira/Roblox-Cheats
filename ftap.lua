@@ -207,19 +207,53 @@ local function DoPositionGrab()
     end
 end
 
+-- nomes de joints nativos do personagem — nunca remover
+local SAFE_JOINTS = {
+    RootJoint=true, Neck=true, Left_Shoulder=true, Right_Shoulder=true,
+    Left_Hip=true,  Right_Hip=true, ["Left Shoulder"]=true, ["Right Shoulder"]=true,
+    ["Left Hip"]=true, ["Right Hip"]=true,
+}
+
 local function SetAntiGrab(on)
     if AntiGrabConn then AntiGrabConn:Disconnect(); AntiGrabConn = nil end
     if not on then return end
     AntiGrabConn = RunService.Heartbeat:Connect(function()
-        local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        for _, inst in ipairs(hrp:GetChildren()) do
-            if (inst:IsA("Weld") or inst:IsA("WeldConstraint") or inst:IsA("RigidConstraint")
-            or inst:IsA("BodyVelocity") or inst:IsA("BodyForce") or inst:IsA("BodyPosition"))
-            and inst.Name ~= "RootJoint" then
-                pcall(function() inst:Destroy() end)
-            end
+        local char = LP.Character
+        if not char then return end
+
+        -- varre TODO o personagem, não só o HRP
+        for _, inst in ipairs(char:GetDescendants()) do
+            if SAFE_JOINTS[inst.Name] then continue end
+
+            local remove = false
+
+            -- constraints físicas usadas pelo FTAP para travar o player
+            if inst:IsA("WeldConstraint")       then remove = true end
+            if inst:IsA("Weld")                 then remove = true end
+            if inst:IsA("RigidConstraint")      then remove = true end
+            if inst:IsA("BallSocketConstraint") then remove = true end
+            if inst:IsA("HingeConstraint")      then remove = true end
+            if inst:IsA("NoCollisionConstraint")then remove = true end
+
+            -- AlignPosition / AlignOrientation — principal método do FTAP
+            if inst:IsA("AlignPosition")        then remove = true end
+            if inst:IsA("AlignOrientation")     then remove = true end
+
+            -- forças externas aplicadas ao HRP
+            if inst:IsA("BodyVelocity")         then remove = true end
+            if inst:IsA("BodyForce")            then remove = true end
+            if inst:IsA("BodyPosition")         then remove = true end
+            if inst:IsA("BodyAngularVelocity")  then remove = true end
+            if inst:IsA("LinearVelocity")       then remove = true end
+            if inst:IsA("AngularVelocity")      then remove = true end
+            if inst:IsA("VectorForce")          then remove = true end
+
+            if remove then pcall(function() inst:Destroy() end) end
         end
+
+        -- garante que o HRP nunca fica ancorado por outro script
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then hrp.Anchored = false end
     end)
 end
 
